@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- dark terminal card on the lime adaptive background -->
+    <path
+        android:fillColor="#111214"
+        android:pathData="M30,36 h48 a6,6 0 0 1 6,6 v24 a6,6 0 0 1 -6,6 h-48 a6,6 0 0 1 -6,-6 v-24 a6,6 0 0 1 6,-6 z" />
+    <!-- prompt chevron -->
+    <path
+        android:strokeColor="#B8F477"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M38,50 l8,7 -8,7" />
+    <!-- cursor -->
+    <path
+        android:strokeColor="#B8F477"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:pathData="M52,66 h12" />
+</vector>
