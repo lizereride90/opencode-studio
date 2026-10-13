@@ -37,16 +37,20 @@ jobs:
           name: opencode-studio-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
       - name: Sign release APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign
-        with:
-          releaseDirectory: android/app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          alias: ${{ secrets.SIGNING_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          BT="$ANDROID_SDK_ROOT/build-tools/34.0.0"
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > /tmp/release.jks
+          "$BT/zipalign" -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk android/app/build/outputs/apk/release/app-release-aligned.apk
+          "$BT/apksigner" sign --ks /tmp/release.jks --ks-pass:env SIGNING_STORE_PASSWORD --key-pass:env SIGNING_KEY_PASSWORD --ks-key-alias "$SIGNING_KEY_ALIAS" --out android/app/build/outputs/apk/release/app-release-signed.apk android/app/build/outputs/apk/release/app-release-aligned.apk
+          "$BT/apksigner" verify --print-certs android/app/build/outputs/apk/release/app-release-signed.apk
+          rm -f /tmp/release.jks
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: opencode-studio-release-apk
-          path: ${{ steps.sign.outputs.signedReleaseFile }}
+          path: android/app/build/outputs/apk/release/app-release-signed.apk
