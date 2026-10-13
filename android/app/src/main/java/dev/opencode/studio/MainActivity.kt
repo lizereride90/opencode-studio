@@ -9,9 +9,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -64,6 +66,8 @@ private fun StudioApp() {
     val scope = rememberCoroutineScope()
     val api = remember { OpenCodeApi() }
     var page by remember { mutableStateOf(Page.Chat) }
+    var termFullscreen by remember { mutableStateOf(false) }
+    val chromeHidden = page == Page.Terminal && termFullscreen
     var draft by remember { mutableStateOf("") }
     var status by remember { mutableStateOf(if (app.hasOpenCode()) "Starting Debian · OpenCode…" else "Debian Trixie is not installed") }
     var runtimeBusy by remember { mutableStateOf(false) }
@@ -123,15 +127,17 @@ private fun StudioApp() {
 
     MaterialTheme(colorScheme = darkColorScheme(background = Ink, surface = Surface, primary = Lime)) {
         Scaffold(containerColor = Ink, bottomBar = {
+            if (!chromeHidden) {
             NavigationBar(containerColor = Color(0xFF151619), contentColor = Muted, tonalElevation = 0.dp) {
                 Page.entries.forEach { p ->
                     NavigationBarItem(selected = page == p, onClick = { page = p }, icon = { Icon(p.icon, null, Modifier.size(20.dp)) },
                         label = { Text(p.label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Lime, selectedTextColor = Lime, indicatorColor = Surface2, unselectedIconColor = Muted, unselectedTextColor = Muted))
                 }
             }
+            }
         }) { inset ->
             Column(Modifier.fillMaxSize().padding(inset).background(Ink)) {
-                TopBar(page, status)
+                if (!chromeHidden) TopBar(page, status)
                 when (page) {
                     Page.Chat -> ChatPage(status, runtimeBusy, draft, transcript.toList(), sending, serverLog.toList(), ::installAndConfigure,
                         onSend = { text ->
@@ -146,7 +152,7 @@ private fun StudioApp() {
                                 }
                             }
                         }) { draft = it }
-                    Page.Terminal -> TerminalPage(app)
+                    Page.Terminal -> TerminalPage(app, termFullscreen) { termFullscreen = it }
                     Page.Files -> FilesPage(app, ::notify)
                     Page.Browser -> BrowserPage()
                     Page.Mcp -> McpPage(app, api)
@@ -236,7 +242,7 @@ private fun PageTitle(kicker: String, title: String, subtitle: String) {
 }
 
 @Composable
-private fun TerminalPage(app: StudioApplication) {
+private fun TerminalPage(app: StudioApplication, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
     val context = LocalContext.current
     val output = remember { mutableStateListOf("OpenCode Studio terminal", "Starting Debian Trixie shell…") }
     var command by remember { mutableStateOf("") }
@@ -256,17 +262,42 @@ private fun TerminalPage(app: StudioApplication) {
         }
     }
     DisposableEffect(Unit) { onDispose { shell?.close() } }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        PageTitle("DEBIAN 13 · LIVE PTY", "Terminal", "Interactive bash running inside your Debian workspace")
-        Spacer(Modifier.height(14.dp))
+    Column(Modifier.fillMaxSize().padding(if (fullscreen) 8.dp else 16.dp)) {
+        if (!fullscreen) {
+            PageTitle("DEBIAN 13 · LIVE PTY", "Terminal", "Interactive bash running inside your Debian workspace")
+            Spacer(Modifier.height(14.dp))
+        }
         Column(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF101113), RoundedCornerShape(9.dp)).padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(6.dp).background(Lime, RoundedCornerShape(99.dp))); Spacer(Modifier.width(7.dp)); Text("bash · ${if (shell == null) "disconnected" else "connected"}", color = Color.White, fontSize = 10.sp); Spacer(Modifier.weight(1f)); Text("UTF-8", fontSize = 9.sp, color = Muted) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(6.dp).background(Lime, RoundedCornerShape(99.dp))); Spacer(Modifier.width(7.dp))
+                Text("bash · ${if (shell == null) "disconnected" else "connected"}", color = Color.White, fontSize = 10.sp)
+                Spacer(Modifier.weight(1f)); Text("UTF-8", fontSize = 9.sp, color = Muted)
+                IconButton(onClick = { onFullscreen(!fullscreen) }, modifier = Modifier.size(30.dp)) {
+                    Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen, null, tint = Lime, modifier = Modifier.size(16.dp))
+                }
+            }
             Spacer(Modifier.height(12.dp))
             LazyColumn(Modifier.weight(1f), reverseLayout = true) { items(output.asReversed()) { Text(it, fontFamily = FontFamily.Monospace, fontSize = 10.sp, lineHeight = 15.sp, color = Color(0xFFD1D2D5)) } }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf("Tab", "/", "~", "|", "--", "Esc").forEach { key ->
+                    TextButton(onClick = {
+                        if (key == "Esc") command = ""
+                        else if (key == "Tab") command += "  "
+                        else command += key
+                    }) { Text(key, fontSize = 10.sp, color = Lilac, fontFamily = FontFamily.Monospace) }
+                }
+            }
             Row(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("❯", color = Lime, fontFamily = FontFamily.Monospace); Spacer(Modifier.width(8.dp))
                 BasicTextField(command, onValueChange = { command = it }, modifier = Modifier.weight(1f).padding(vertical = 8.dp), textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 11.sp), decorationBox = { inner -> if (command.isEmpty()) Text("Enter a command…", color = Muted, fontSize = 11.sp); inner() })
                 IconButton(enabled = shell != null, onClick = { shell?.write((command + "\n").toByteArray()); command = "" }) { Icon(Icons.Default.Send, null, tint = Lime) }
+            }
+        }
+        if (fullscreen) {
+            Spacer(Modifier.height(6.dp))
+            Button(onClick = { onFullscreen(false) }, modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Surface2, contentColor = Muted)) {
+                Text("Exit fullscreen", fontSize = 11.sp)
             }
         }
     }
