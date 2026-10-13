@@ -1,22 +1,13 @@
-# OpenCode Studio
+# OpenCode Studio for Android
 
-A native-inspired OpenCode workspace UI prototype built with Next.js. It brings session chat, terminal, file explorer/ZIP export, browser controls, and five MCP server cards into a compact desktop-style layout.
+An Android-native Jetpack Compose project is in [`android/`](android/). Open that directory in Android Studio, or use the **Android app build** GitHub Actions workflow to produce a debug APK.
 
-## Run locally
+The earlier root-level Next.js UI was the wrong platform and is retained temporarily as a historical prototype; the Android app is the intended project going forward.
 
-Requires Node.js 20+.
+## Current Android milestone
 
-```sh
-npm ci
-npm run dev
-```
+The native app shell contains Chat, Terminal, Files, Browser, and five MCP setup panels. Debian Trixie / OpenCode runtime provisioning and live API integration are not yet implemented; tool screens report when their runtime is unavailable rather than pretending commands are executing. Runtime work needs an Android-compatible PRoot binary, Debian ARM64 root filesystem bootstrap, and a supervised local OpenCode server.
 
-Then open http://localhost:3000.
+## Build
 
-## Important
-
-This repository currently implements the interactive UI prototype. The terminal, browser, chat agent, and MCP status cards are interface demonstrations—not connections to a local OpenCode server or host shell. A browser-based Next.js app cannot safely provide native terminal/filesystem access on its own; connecting those capabilities needs a trusted local companion/runtime and explicit permissions.
-
-## CI
-
-GitHub Actions runs TypeScript checks and a production Next.js build for pushes and pull requests to `main`.
+Open `android/` in Android Studio with JDK 17, or run `gradle --no-daemon assembleDebug` there with Gradle 8.11.1. The APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
