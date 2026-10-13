@@ -23,7 +23,7 @@ class StudioApplication : Application(), ProotHost {
     override val prefixDir get() = File(filesDir, "usr")
     override val homeDir get() = File(filesDir, "home")
     @get:JvmName("getProotPackageName") override val packageName get() = super.getPackageName()
-    @get:JvmName("getProotCacheDir") override val cacheDir get() = super.cacheDir
+    @get:JvmName("getProotCacheDir") override val cacheDir get() = File(filesDir, "proot-cache").also { it.mkdirs() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val launcher by lazy { ProotLauncher(this) }
     @Volatile private var serverJob: Job? = null

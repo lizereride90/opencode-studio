@@ -133,7 +133,7 @@ private fun StudioApp() {
             Column(Modifier.fillMaxSize().padding(inset).background(Ink)) {
                 TopBar(page, status)
                 when (page) {
-                    Page.Chat -> ChatPage(status, runtimeBusy, transcript.toList(), sending, serverLog.toList(), ::installAndConfigure,
+                    Page.Chat -> ChatPage(status, runtimeBusy, draft, transcript.toList(), sending, serverLog.toList(), ::installAndConfigure,
                         onSend = { text ->
                             val id = sessionId
                             if (id == null) notify("Start Debian and OpenCode first")
@@ -178,7 +178,7 @@ private fun TopBar(page: Page, status: String) {
 }
 
 @Composable
-private fun ChatPage(status: String, busy: Boolean, transcript: List<ChatEntry>, sending: Boolean, logs: List<String>, onInstall: () -> Unit, onSend: (String) -> Unit, onDraft: (String) -> Unit) {
+private fun ChatPage(status: String, busy: Boolean, draft: String, transcript: List<ChatEntry>, sending: Boolean, logs: List<String>, onInstall: () -> Unit, onSend: (String) -> Unit, onDraft: (String) -> Unit) {
     var showLog by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(22.dp))
@@ -344,7 +344,7 @@ private fun BrowserPage() {
             IconButton(onClick = { browser?.loadUrl(normalizeUrl(address)) }) { Icon(Icons.Default.ArrowUpward, null, tint = Lime) }
         }
         if (progress in 1..99) LinearProgressIndicator(progress = { progress / 100f }, color = Lime, trackColor = Surface2)
-        AndroidView(Modifier.fillMaxSize().padding(top = 8.dp).background(Color.White, RoundedCornerShape(8.dp)), factory = { ctx ->
+        AndroidView(modifier = Modifier.fillMaxSize().padding(top = 8.dp).background(Color.White, RoundedCornerShape(8.dp)), factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
