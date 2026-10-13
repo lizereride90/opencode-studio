@@ -22,7 +22,12 @@ android {
     }
     sourceSets.getByName("main").assets.srcDir("runtime-upstream/android/app/src/main/assets")
     buildFeatures { compose = true }
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Native libs must be extracted to nativeLibraryDir at install time:
+        // the app symlinks + executes proot/pr-cli/busybox from app-private storage.
+        jniLibs { useLegacyPackaging = true }
+    }
 }
 
 dependencies {

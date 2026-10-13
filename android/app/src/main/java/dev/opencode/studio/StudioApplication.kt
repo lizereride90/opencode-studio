@@ -38,18 +38,29 @@ class StudioApplication : Application(), ProotHost {
             File(prefixDir, it).mkdirs()
         }
         homeDir.mkdirs()
-        // The upstream engine packages patched ARM64 host binaries in jniLibs. Symlinks are
-        // intentional: Android permits loading/executing app-native libraries from nativeLibDir.
+        // The upstream engine packages patched ARM64 host binaries in jniLibs. They are
+        // COPIED (never symlinked) into the private prefix and marked executable: the
+        // bundled .so files are mode 644, and a symlink would inherit the non-exec bit.
+        // NOTE: this requires extractNativeLibs=true (see manifest + useLegacyPackaging),
+        // otherwise the .so files stay inside the APK and never appear on disk.
         val native = File(applicationInfo.nativeLibraryDir)
         mapOf("proot" to "libproot.so", "pr-cli" to "libpr-cli.so", "busybox" to "libbusybox.so").forEach { (name, lib) ->
-            val link = File(prefixDir, "bin/$name")
+            val dest = File(prefixDir, "bin/$name")
             val target = File(native, lib)
-            if (target.exists() && (!link.exists() || runCatching { link.canonicalPath }.getOrNull() != target.canonicalPath)) {
-                link.delete()
-                runCatching { Os.symlink(target.absolutePath, link.absolutePath) }
-                    .onFailure { Log.e(TAG, "Cannot link $name", it) }
+            try {
+                if (!target.exists()) {
+                    Log.e(TAG, "Missing native lib ${target.absolutePath} — reinstall the APK (native libs were not extracted)")
+                } else if (!dest.isFile || dest.length() != target.length()) {
+                    stageExecutable(target, dest)
+                } else if (!dest.canExecute() && !dest.setExecutable(true)) {
+                    // stale symlink from an older app version, or lost exec bit — restage
+                    stageExecutable(target, dest)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Cannot stage $name", e)
             }
         }
+        runtimeBinaryError()?.let { Log.e(TAG, it) }
         runCatching {
             assets.open("bin/busybox.applets").bufferedReader().useLines { lines ->
                 lines.map(String::trim).filter { it.isNotEmpty() && it != "[" && it != "]" }.forEach { applet ->
@@ -63,9 +74,28 @@ class StudioApplication : Application(), ProotHost {
     fun hasDebian(): Boolean = File(prefixDir, "var/lib/pr/containers/debian/rootfs/etc/debian_version").isFile
     fun hasOpenCode(): Boolean = hasDebian() && File(prefixDir, "var/lib/pr/containers/debian/rootfs/root/.local/share/opencode-studio/setup-ok").isFile
 
-    fun installDebian(onLine: (String) -> Unit, onDone: (Boolean) -> Unit) = runPty(
-        listOf(File(prefixDir, "bin/pr-cli").absolutePath, "install", "debian:trixie", "--override-alias", "debian"), onLine
-    ) { _ -> onDone(hasDebian()) }
+    /** Non-null when the staged proot/pr-cli/busybox binaries are not runnable. */
+    fun runtimeBinaryError(): String? {
+        val bad = listOf("proot", "pr-cli", "busybox")
+            .map { File(prefixDir, "bin/$it") }
+            .filter { !it.isFile || !it.canExecute() }
+            .map { it.name }
+        return if (bad.isEmpty()) null
+        else "Runtime binaries missing (${bad.joinToString(", ")}). Update to the latest app version or reinstall — the Debian installer cannot run without them."
+    }
+
+    private fun stageExecutable(target: File, dest: File) {
+        dest.delete()
+        target.inputStream().use { ins -> dest.outputStream().use { outs -> ins.copyTo(outs) } }
+        if (!dest.setExecutable(true)) Log.e(TAG, "Could not set executable bit on ${dest.absolutePath}")
+    }
+
+    fun installDebian(onLine: (String) -> Unit, onDone: (Boolean) -> Unit) =
+        runtimeBinaryError()?.let { err ->
+            scope.launch(Dispatchers.Main) { onLine(err); onDone(false) }
+        } ?: runPty(
+            listOf(File(prefixDir, "bin/pr-cli").absolutePath, "install", "debian:trixie", "--override-alias", "debian"), onLine
+        ) { _ -> onDone(hasDebian()) }
 
     fun configureOpenCode(onLine: (String) -> Unit, onDone: (Boolean) -> Unit) {
         val script = """
