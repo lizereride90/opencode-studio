@@ -18,6 +18,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Android native build tools
         run: sdkmanager "platforms;android-36" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
