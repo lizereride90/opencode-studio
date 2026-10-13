@@ -1,0 +1,3 @@
+[submodule "android/runtime-upstream"]
+	path = android/runtime-upstream
+	url = https://github.com/oonid/pr.git

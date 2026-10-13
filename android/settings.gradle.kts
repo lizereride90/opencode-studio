@@ -5,3 +5,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "OpenCodeStudio"
 include(":app")
+include(":proot-engine")
+project(":proot-engine").projectDir = file("runtime-upstream/android/proot-engine")
