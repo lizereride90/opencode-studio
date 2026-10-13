@@ -41,7 +41,7 @@ jobs:
           BT="$ANDROID_SDK_ROOT/build-tools/34.0.0"
           echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > /tmp/release.jks
           "$BT/zipalign" -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk android/app/build/outputs/apk/release/app-release-aligned.apk
-          "$BT/apksigner" sign --ks /tmp/release.jks --ks-pass:env SIGNING_STORE_PASSWORD --key-pass:env SIGNING_KEY_PASSWORD --ks-key-alias "$SIGNING_KEY_ALIAS" --out android/app/build/outputs/apk/release/app-release-signed.apk android/app/build/outputs/apk/release/app-release-aligned.apk
+          "$BT/apksigner" sign --ks /tmp/release.jks --ks-pass env:SIGNING_STORE_PASSWORD --key-pass env:SIGNING_KEY_PASSWORD --ks-key-alias "$SIGNING_KEY_ALIAS" --out android/app/build/outputs/apk/release/app-release-signed.apk android/app/build/outputs/apk/release/app-release-aligned.apk
           "$BT/apksigner" verify --print-certs android/app/build/outputs/apk/release/app-release-signed.apk
           rm -f /tmp/release.jks
         env:
