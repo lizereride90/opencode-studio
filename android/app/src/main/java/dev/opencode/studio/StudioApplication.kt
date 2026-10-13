@@ -39,25 +39,32 @@ class StudioApplication : Application(), ProotHost {
         }
         homeDir.mkdirs()
         // The upstream engine packages patched ARM64 host binaries in jniLibs. They are
-        // COPIED (never symlinked) into the private prefix and marked executable: the
-        // bundled .so files are mode 644, and a symlink would inherit the non-exec bit.
-        // NOTE: this requires extractNativeLibs=true (see manifest + useLegacyPackaging),
-        // otherwise the .so files stay inside the APK and never appear on disk.
+        // SYMLINKED (never copied) into the private prefix: on targetSdk 29+ SELinux
+        // only allows execve on files labeled apk_data_file (nativeLibraryDir) — plain
+        // files under app data (app_data_file) are denied even when chmodded (errno=13).
+        // The symlink itself needs no exec bit; the permission check applies to the
+        // target in nativeLibraryDir. Requires extractNativeLibs=true (see manifest).
         val native = File(applicationInfo.nativeLibraryDir)
-        mapOf("proot" to "libproot.so", "pr-cli" to "libpr-cli.so", "busybox" to "libbusybox.so").forEach { (name, lib) ->
-            val dest = File(prefixDir, "bin/$name")
+        for ((name, lib) in mapOf("proot" to "libproot.so", "pr-cli" to "libpr-cli.so", "busybox" to "libbusybox.so")) {
+            val link = File(prefixDir, "bin/$name")
             val target = File(native, lib)
+            if (!target.exists()) {
+                Log.e(TAG, "Missing native lib ${target.absolutePath} — reinstall the APK (native libs were not extracted)")
+                continue
+            }
+            if (!target.canExecute()) Log.w(TAG, "$lib in nativeLibraryDir is not executable; exec may fail")
             try {
-                if (!target.exists()) {
-                    Log.e(TAG, "Missing native lib ${target.absolutePath} — reinstall the APK (native libs were not extracted)")
-                } else if (!dest.isFile || dest.length() != target.length()) {
-                    stageExecutable(target, dest)
-                } else if (!dest.canExecute() && !dest.setExecutable(true)) {
-                    // stale symlink from an older app version, or lost exec bit — restage
-                    stageExecutable(target, dest)
+                // Migrate away from regular-file copies staged by an older app version.
+                if (link.isFile && !java.nio.file.Files.isSymbolicLink(link.toPath())) link.delete()
+                if (link.exists()) {
+                    if (runCatching { link.canonicalPath }.getOrNull() == target.canonicalPath) continue
+                    link.delete()
+                } else if (java.nio.file.Files.isSymbolicLink(link.toPath())) {
+                    link.delete()
                 }
+                Os.symlink(target.absolutePath, link.absolutePath)
             } catch (e: Exception) {
-                Log.e(TAG, "Cannot stage $name", e)
+                Log.e(TAG, "Cannot link $name", e)
             }
         }
         runtimeBinaryError()?.let { Log.e(TAG, it) }
@@ -82,12 +89,6 @@ class StudioApplication : Application(), ProotHost {
             .map { it.name }
         return if (bad.isEmpty()) null
         else "Runtime binaries missing (${bad.joinToString(", ")}). Update to the latest app version or reinstall — the Debian installer cannot run without them."
-    }
-
-    private fun stageExecutable(target: File, dest: File) {
-        dest.delete()
-        target.inputStream().use { ins -> dest.outputStream().use { outs -> ins.copyTo(outs) } }
-        if (!dest.setExecutable(true)) Log.e(TAG, "Could not set executable bit on ${dest.absolutePath}")
     }
 
     fun installDebian(onLine: (String) -> Unit, onDone: (Boolean) -> Unit) =
